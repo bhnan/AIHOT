@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>放宽 14 天召回窗口 —— 原型审阅</title>
+<style>
+  :root{
+    --ink:#1b2430; --ink-2:#465568; --ink-3:#5f6b79; --line:#d8dee7; --bg:#f6f8fa; --card:#fff;
+    --teal:#0f6b6b; --teal-bg:#e6f2f1; --amber:#9a5b00; --amber-bg:#fdf3e0;
+    --red:#a3231f; --red-bg:#fbeceb; --grey:#8b97a6; --grey-bg:#eef1f5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#e9edf2; --ink-2:#b7c1cd; --ink-3:#8d99a8; --line:#39424e; --bg:#12171d; --card:#1a2027;
+      --teal:#5fc9c4; --teal-bg:#14302f; --amber:#e2ab54; --amber-bg:#33280f;
+      --red:#f08b86; --red-bg:#3a1d1c; --grey:#7b8794; --grey-bg:#242c35; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 72px}
+  h1{font-size:24px;line-height:1.35;margin:0 0 8px}
+  h2{font-size:17px;margin:0 0 10px}
+  h3{font-size:14px;margin:18px 0 6px;color:var(--ink-2)}
+  p{margin:8px 0}
+  code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--grey-bg);
+    padding:1px 5px;border-radius:4px;color:var(--ink)}
+  .lede{color:var(--ink-2);max-width:76ch}
+  .badges{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 22px;padding:0;list-style:none}
+  .badges li{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--line)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:0 0 18px}
+  .rec{border-left:4px solid var(--teal);background:var(--teal-bg)}
+  .rec strong{color:var(--teal)}
+  .grid{display:grid;gap:18px;grid-template-columns:1fr}
+  @media (min-width:860px){ .grid.two{grid-template-columns:1fr 1fr} }
+  .controls{display:grid;gap:16px;grid-template-columns:1fr}
+  @media (min-width:720px){ .controls{grid-template-columns:1fr 1fr} }
+  label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:4px}
+  input[type=range]{width:100%;accent-color:var(--teal)}
+  input[type=number]{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+  .radios{display:flex;flex-wrap:wrap;gap:14px}
+  .radios label{display:flex;align-items:center;gap:6px;color:var(--ink);margin:0;font-size:14px}
+  .check{display:flex;align-items:flex-start;gap:8px;color:var(--ink);font-size:14px;margin:0}
+  .check input{margin-top:4px}
+  button{font:inherit;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);
+    color:var(--ink);cursor:pointer}
+  button:hover{border-color:var(--ink-3)}
+  :focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+  /* 时间轴 */
+  .axis{position:relative;height:132px;margin:6px 0 4px;border-bottom:2px solid var(--line)}
+  .band{position:absolute;top:0;bottom:0;background:var(--teal-bg);border-left:1px dashed var(--teal);opacity:.85}
+  .band span{position:absolute;top:4px;left:6px;font-size:11px;color:var(--teal);white-space:nowrap}
+  .today{position:absolute;right:0;top:0;bottom:0;border-left:2px solid var(--ink-3)}
+  .today span{position:absolute;bottom:-22px;right:0;font-size:11px;color:var(--ink-3)}
+  .tick{position:absolute;bottom:-22px;font-size:11px;color:var(--ink-3);transform:translateX(-50%)}
+  .node{position:absolute;transform:translateX(-50%);width:34px;height:34px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;
+    border:2px solid var(--grey);background:var(--grey-bg);color:var(--ink-2)}
+  .node.in{border-color:var(--teal);background:var(--teal-bg);color:var(--teal)}
+  .node .stem{position:absolute;top:32px;width:2px;background:var(--line)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink-2);margin-top:28px}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px;
+    border:2px solid var(--grey);background:var(--grey-bg)}
+  .legend i.in{border-color:var(--teal);background:var(--teal-bg)}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink-2);font-weight:600;font-size:12.5px}
+  .tag{display:inline-block;font-size:11.5px;padding:2px 7px;border-radius:99px;border:1px solid var(--line);white-space:nowrap}
+  .t-same{background:var(--teal-bg);color:var(--teal);border-color:var(--teal)}
+  .t-unrel{background:var(--grey-bg);color:var(--ink-2)}
+  .t-review{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
+  .t-out{background:transparent;color:var(--ink-3);border-style:dashed}
+  .empty{color:var(--ink-3);font-size:13.5px}
+  .metric{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .metric:last-child{border-bottom:0}
+  .metric b{font-variant-numeric:tabular-nums}
+  .state-ok{color:var(--teal)} .state-near{color:var(--amber)} .state-over{color:var(--red)}
+  .verdict{border-radius:10px;padding:12px 14px;font-size:14.5px;margin-top:12px;border:1px solid var(--line)}
+  .verdict.bad{background:var(--red-bg);border-color:var(--red);color:var(--red)}
+  .verdict.good{background:var(--teal-bg);border-color:var(--teal);color:var(--teal)}
+  .verdict b{display:block;font-size:15px;margin-bottom:2px}
+  ul.tight{margin:6px 0 0;padding-left:20px} ul.tight li{margin:5px 0}
+  .chosen{background:var(--teal-bg)}
+  footer{color:var(--ink-3);font-size:12.5px;margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>放宽 14 天召回窗口 —— 原型审阅</h1>
+  <p class="lede"><strong>决定：</strong>要不要把 <code>RECALL_DAYS = 14</code> 改大？还是改用别的办法，让"退潮后重新出现的后续"能接回原事件。</p>
+  <ul class="badges">
+    <li>时间轴与数字均为<strong>合成数据</strong></li>
+    <li>模型判定是<strong>简化示意</strong>，不是引擎真实逻辑</li>
+    <li><strong>未经浏览器验证</strong>（本机无浏览器）</li>
+    <li>一次性原型，非生产代码</li>
+  </ul>
+
+  <div class="card rec">
+    <h2>建议</h2>
+    <p><strong>先不要全局放宽。</strong>把 14 天留给"常规认亲"，另外做一条<strong>定向召回</strong>：只对"未结案 / 你关注 / 重要"的事件，用它的主体、标签、向量近邻去找可能的后续。成本与<strong>事件数</strong>成正比，而不是与<strong>全库历史</strong>成正比。</p>
+    <p>只有当你的站日均量远低于"撞墙线"<strong>并且</strong>你愿意同时改提示词口径时，全局放宽（90–180 天）才划算。下面可以亲手把这三种情况比一遍。</p>
+  </div>
+
+  <div class="card">
+    <h2>① 亲手调：窗口决定"旧事件能不能被看见"</h2>
+    <div class="controls">
+      <div>
+        <label for="win">召回窗口：<b id="winVal">14</b> 天（<code>RECALL_DAYS</code>）</label>
+        <input id="win" type="range" min="7" max="365" step="1" value="14">
+      </div>
+      <div>
+        <label for="perDay">你的日均带事实报道数（用来算撞墙线）</label>
+        <input id="perDay" type="number" min="1" max="5000" step="10" value="300">
+      </div>
+      <div>
+        <span class="radios" role="radiogroup" aria-label="新报道场景">
+          <label><input type="radio" name="scn" value="launch" checked> 今天：Acme 正式发布 Acme-4</label>
+          <label><input type="radio" name="scn" value="settle"> 今天：Acme 与 BigCo 诉讼达成和解</label>
+        </span>
+      </div>
+      <div>
+        <label class="check"><input id="strict" type="checkbox">
+          <span>配套改口径：给提示词加一条「跨度超过 90 天的旧事，除非是同一案件的持续披露，否则按 UNRELATED」</span></label>
+        <p style="margin:10px 0 0"><button id="reset" type="button">重置为默认（14 天 / 发布场景 / 口径关）</button></p>
+      </div>
+    </div>
+
+    <h3>时间轴（左＝更久以前，右＝今天）</h3>
+    <div class="axis" id="axis" role="img" aria-label="过去事件与新报道在时间轴上的位置，以及当前召回窗口覆盖的范围"></div>
+    <div class="legend">
+      <span><i class="in"></i>在窗口内：会进入候选池</span>
+      <span><i></i>在窗口外：模型根本看不到</span>
+      <span>淡色区域＝当前窗口覆盖的时间范围</span>
+    </div>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <h2>② 门一 · 召回（机械，不用模型）</h2>
+      <p class="lede" style="font-size:13.5px">窗口内的材料先按<strong>相似度 ≥ 0.6</strong> 过一遍，再按相似度取<strong>前 10</strong> 个送进模型。</p>
+      <div id="gate1"></div>
+    </div>
+
+    <div class="card">
+      <h2>③ 门二 · 判定（模型 + 口径）</h2>
+      <p class="lede" style="font-size:13.5px">模型只看得到门一递进来的候选。相似度 <strong>&lt; 0.85</strong> 的候选还要<strong>换第二家模型复核</strong>一次。</p>
+      <div id="gate2"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>④ 结果</h2>
+    <div id="outcome" aria-live="polite"></div>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <h2>⑤ 放宽的代价</h2>
+      <div id="cost"></div>
+      <p class="empty" style="margin-top:10px">"撞墙线"指：候选池是把<strong>整个窗口全量加载</strong>的，而向量缓存<strong>超过 30,000 条会整体清空</strong>，之后反复重算。</p>
+    </div>
+    <div class="card">
+      <h2>⑥ 三个方案怎么选</h2>
+      <table>
+        <thead><tr><th>方案</th><th>能接回老事件</th><th>模型费用</th><th>召回开销</th><th>误合并风险</th></tr></thead>
+        <tbody>
+          <tr><td>现状 14 天</td><td>只在 14 天内</td><td>低</td><td>低</td><td>低</td></tr>
+          <tr><td>全局放宽 90–180 天</td><td>是</td><td>基本不变</td><td class="state-near">线性上升</td><td class="state-near">上升</td></tr>
+          <tr class="chosen"><td>定向召回（推荐）</td><td>是（对你关注的事件）</td><td>略升</td><td>与事件数成正比</td><td>中</td></tr>
+          <tr><td>两级窗口（长窗口只出候选、人工确认）</td><td>是</td><td>略升</td><td>中</td><td>低</td></tr>
+        </tbody>
+      </table>
+      <p class="empty" style="margin-top:10px">注意：<strong>模型费用不随窗口增长</strong>（只有前 10 个进模型）；涨的是召回侧的计算，以及误挂风险。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⑦ 依据（真实代码，已核对当前 checkout）</h2>
+    <table>
+      <thead><tr><th>事实</th><th>位置</th></tr></thead>
+      <tbody>
+        <tr><td><code>RECALL_DAYS = 14</code>，<strong>没有</strong>环境变量或后台设置能覆盖</td><td><code>packages/backend/src/events/recall.ts:15</code></td></tr>
+        <tr><td>一个常量同时控制三件事：身份候选池、<strong>阅读背景池</strong>、<code>related</code> 链接的 tie 统计</td><td><code>recall.ts:55</code>、<code>recall.ts:67</code>、<code>consolidate.ts:145</code></td></tr>
+        <tr><td>候选池查询<strong>没有 LIMIT</strong>，整窗口全量加载；相似度在 JS 里逐条算</td><td><code>recall.ts:48-56</code></td></tr>
+        <tr><td>只有前 10 个候选进模型 → 模型费用基本不随窗口增长</td><td><code>RECALL_TOP_FACTS = 10</code></td></tr>
+        <tr><td>相似度门槛 0.6；低于 0.85 的候选要第二家模型复核</td><td><code>RECALL_MIN_COSINE</code>、<code>CONFIRM_BELOW_COSINE</code></td></tr>
+        <tr><td>向量缓存<strong>超过 30,000 条整体清空</strong></td><td><code>recall.ts:109</code></td></tr>
+        <tr><td>每个候选都带发布时间，<strong>模型看得见跨度</strong>——缺的是"多大跨度还算直接进展"的口径</td><td><code>relate.ts:98</code>；口径见 <code>prompts/group-definitions.md</code></td></tr>
+        <tr><td>事件<strong>不会链式爆炸</strong>：后续只挂"开启事件的根事实"，与窗口无关</td><td><code>events/group.ts</code> 文件头</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>⑧ 这份原型没做什么</h2>
+    <ul class="tight">
+      <li><strong>没有</strong>改任何代码：<code>RECALL_DAYS</code> 仍是 14。</li>
+      <li>时间轴上的事件、相似度、日均量都是<strong>编的</strong>，只用来说明机制。</li>
+      <li>"模型判定"是一条简化规则，<strong>不能</strong>用来预测线上结果。</li>
+      <li>没有验证真实站点在 90/180 天下的召回耗时、误挂率、精选条数变化。</li>
+      <li>本机<strong>没有浏览器</strong>：交互路径未经真实浏览器点击验证，只做了静态检查与纯逻辑断言。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>⑨ 需要你决定</h2>
+    <ul class="tight">
+      <li>走<strong>定向召回</strong>，还是<strong>先全局放宽试一个月</strong>？</li>
+      <li>如果放宽，<strong>是否同时改提示词口径</strong>（加跨度上限）？——不改口径，放宽只会让旧闻占掉候选位。</li>
+      <li>你的<strong>日均带事实报道数</strong>大概多少？这决定 30k 撞墙线落在哪个窗口。</li>
+    </ul>
+  </div>
+
+  <footer>一次性原型 · 合成数据 · 判定为示意 · 结论依据来自当前 checkout <code>6e67a9d</code></footer>
+</div>
+
+<script>
+// #region sim
+"use strict";
+const NODES = [
+  { id:"E0", age:320, label:"Acme-2 的用户吐槽长文",     kind:"review",               sim:{ launch:0.62, settle:0.10 } },
+  { id:"E1", age:300, label:"Acme 发布 Acme-2",        kind:"same-product-release", sim:{ launch:0.91, settle:0.22 } },
+  { id:"E2", age:150, label:"Acme 与 BigCo 诉讼",        kind:"same-case",            sim:{ launch:0.18, settle:0.88 } },
+  { id:"E3", age:90,  label:"Acme 发布 Acme-3",         kind:"same-product-release", sim:{ launch:0.93, settle:0.20 } },
+  { id:"E4", age:40,  label:"Acme-3 首批评测",           kind:"review",               sim:{ launch:0.41, settle:0.15 } },
+  { id:"E5", age:5,   label:"Acme 预告 Acme-4",         kind:"precursor",            sim:{ launch:0.79, settle:0.12 } }
+];
+const SCENARIOS = {
+  launch: { label:"Acme 正式发布 Acme-4", matchKind:"precursor", matchReason:"预告 → 正式发布（直接的先后关系）" },
+  settle: { label:"Acme 与 BigCo 诉讼达成和解", matchKind:"same-case", matchReason:"同一案件的持续披露" }
+};
+const TOP_N = 10;            // RECALL_TOP_FACTS
+const SIM_BAR = 0.6;         // RECALL_MIN_COSINE
+const REVIEW_BELOW = 0.85;   // CONFIRM_BELOW_COSINE
+const SPAN_LIMIT_DAYS = 90;  // 仅供演示的"配套口径"跨度上限
+const VECTOR_CACHE = 30000;  // recall.ts:109
+
+// 引擎用的是 discovered_at > now() - interval N days，即"严格早于 N 天"才算窗口内。
+function inWindow(age, windowDays){ return age < windowDays; }
+
+function candidatesFor(scenarioKey, windowDays){
+  return NODES
+    .filter(n => inWindow(n.age, windowDays))
+    .map(n => Object.assign({}, n, { similarity: n.sim[scenarioKey] }))
+    .filter(n => n.similarity >= SIM_BAR)
+    .sort((a,b) => b.similarity - a.similarity)
+    .slice(0, TOP_N);
+}
+
+function judge(cand, scenarioKey, strictSpan){
+  const sc = SCENARIOS[scenarioKey];
+  if (strictSpan && cand.age > SPAN_LIMIT_DAYS && cand.kind !== "same-case")
+    return { relation:"UNRELATED", reason:"超过跨度上限（配套口径）", skippedReview:true };
+  if (cand.kind === sc.matchKind) return { relation:"SAME_STORY", reason:sc.matchReason };
+  if (cand.kind === "precursor") return { relation:"SAME_STORY", reason:"预告 → 正式发布" };
+  if (cand.kind === "same-product-release") return { relation:"UNRELATED", reason:"不同版本的不同发布" };
+  if (cand.kind === "review") return { relation:"UNRELATED", reason:"只是同一主体的另一次发生" };
+  return { relation:"UNRELATED", reason:"只是同一主体" };
+}
+
+function simulate(opts){
+  const windowDays = opts.windowDays, perDay = opts.perDay;
+  const scenarioKey = opts.scenarioKey, strictSpan = !!opts.strictSpan;
+  const pool = NODES.filter(n => inWindow(n.age, windowDays));
+  const cands = candidatesFor(scenarioKey, windowDays);
+  const judged = cands.map(c => {
+    const j = judge(c, scenarioKey, strictSpan);
+    return Object.assign({}, c, j, { needsReview: !j.skippedReview && c.similarity < REVIEW_BELOW });
+  });
+  const match = judged.find(j => j.relation === "SAME_STORY") || null;
+  const reviews = judged.filter(j => j.needsReview).length;
+  const poolSize = Math.round(perDay * windowDays);
+  return {
+    windowDays, perDay, scenarioKey, strictSpan,
+    pool, cands: judged, match,
+    landing: match ? { kind:"attach", node:match } : { kind:"new-event" },
+    cost:{
+      poolSize,
+      backgroundPool: Math.round(poolSize * 0.3),
+      wallMargin: VECTOR_CACHE - poolSize,
+      wallState: poolSize > VECTOR_CACHE ? "over" : poolSize > VECTOR_CACHE * 0.8 ? "near" : "ok",
+      modelCalls: judged.length ? 1 + reviews : 0,
+      reviews
+    }
+  };
+}
+// #endregion sim
+
+/* ---------- 渲染（与判定逻辑无关） ---------- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const state = { windowDays:14, perDay:300, scenarioKey:"launch", strictSpan:false };
+
+function renderAxis(r){
+  const MAXAGE = 365;
+  const pos = (age) => Math.max(2, Math.min(98, (1 - age / MAXAGE) * 100));
+  const bandLeft = pos(r.windowDays);
+  // 窗口窄时（例如 7 天），标签向左侧展开，避免文字溢出色带。
+  const bandLabel = bandLeft > 65
+    ? `style="right:100%;margin-right:6px"` : `style="left:6px"`;
+  let html = "";
+  html += `<div class="band" style="left:${bandLeft}%;right:0"><span ${bandLabel}>窗口 ${r.windowDays} 天</span></div>`;
+  html += `<div class="today"><span>今天</span></div>`;
+  [90,180,270,365].forEach(d => { html += `<div class="tick" style="left:${pos(d)}%">${d} 天前</div>`; });
+  NODES.forEach((n, i) => {
+    const inW = inWindow(n.age, r.windowDays);
+    const top = 34 + (i % 3) * 30;
+    html += `<div class="node ${inW ? "in" : ""}" style="left:${pos(n.age)}%;top:${top}px"
+      title="${esc(n.label)}（${n.age} 天前）">${n.id}</div>`;
+  });
+  $("axis").innerHTML = html;
+}
+
+function renderGates(r){
+  const inPool = r.pool;
+  $("gate1").innerHTML = inPool.length ? `
+    <table><thead><tr><th>窗口内的资料</th><th>距今</th><th>与今天这条的相似度</th><th>结果</th></tr></thead><tbody>
+    ${inPool.map(n => {
+      const sim = n.sim[r.scenarioKey];
+      const pass = sim >= SIM_BAR;
+      return `<tr><td>${esc(n.label)}<br><span class="empty">${n.id}</span></td><td>${n.age} 天</td>
+        <td><b>${sim.toFixed(2)}</b></td>
+        <td>${pass ? '<span class="tag t-same">进模型</span>' : '<span class="tag t-out">低于 0.6，丢掉</span>'}</td></tr>`;
+    }).join("")}</tbody></table>`
+    : `<p class="empty">候选池是空的——窗口内一条资料都没有，模型根本没有东西可比。</p>`;
+
+  $("gate2").innerHTML = r.cands.length ? `
+    <table><thead><tr><th>送到模型的候选</th><th>示意判定</th><th>理由</th><th>复核</th></tr></thead><tbody>
+    ${r.cands.map(c => `<tr><td>${esc(c.label)}<br><span class="empty">${c.id} · 相似度 ${c.similarity.toFixed(2)}</span></td>
+      <td><span class="tag ${c.relation === "SAME_STORY" ? "t-same" : "t-unrel"}">${c.relation}</span></td>
+      <td>${esc(c.reason)}</td>
+      <td>${c.needsReview ? '<span class="tag t-review">要复核</span>' : "—"}</td></tr>`).join("")}
+    </tbody></table>`
+    : `<p class="empty">没有候选送进模型 → 直接<strong>新建一个事件</strong>。</p>`;
+}
+
+function renderOutcome(r){
+  const bad = r.landing.kind === "new-event";
+  const node = bad ? null : r.landing.node;
+  $("outcome").innerHTML = `
+    <div class="verdict ${bad ? "bad" : "good"}">
+      <b>${bad ? "断线：新建了一个事件" : "接回原事件：" + esc(node.label)}</b>
+      ${bad
+        ? `窗口 ${r.windowDays} 天下，与今天这条真正相关的旧事件（E2 诉讼）没有被模型看见，所以它只能开一条新的事件线——你要的"后续"就断了。`
+        : `判定 ${node.relation}（${esc(node.reason)}）→ 新建一个<strong>事实</strong>挂在原<strong>事件</strong>下，这就是"后续进展"。`}
+    </div>
+    <p class="empty" style="margin-top:12px">模型调用：<b>${r.cost.modelCalls}</b> 次（1 次批量判定${r.cost.reviews ? ` + ${r.cost.reviews} 次复核` : ""}）｜候选池：<b>${r.cost.poolSize.toLocaleString()}</b> 条</p>`;
+}
+
+function renderCost(r){
+  const c = r.cost;
+  const stateText = { ok:"安全", near:"接近上限", over:"超限：缓存被整体清空，反复重算" }[c.wallState];
+  const stateCls = { ok:"state-ok", near:"state-near", over:"state-over" }[c.wallState];
+  $("cost").innerHTML = `
+    <div class="metric"><span>候选池（日均 ${r.perDay} × ${r.windowDays} 天）</span><b>${c.poolSize.toLocaleString()} 条</b></div>
+    <div class="metric"><span>距 30,000 撞墙线</span><b class="${stateCls}">${c.wallMargin >= 0 ? "还剩 " + c.wallMargin.toLocaleString() : "超出 " + Math.abs(c.wallMargin).toLocaleString()} · ${stateText}</b></div>
+    <div class="metric"><span>模型调用（示意）</span><b>${c.modelCalls} 次</b></div>
+    <div class="metric"><span>阅读背景池（示意，同样随窗口增长）</span><b>${c.backgroundPool.toLocaleString()} 条</b></div>
+    <div class="metric"><span>进模型的候选数</span><b>${r.cands.length} / 上限 10</b></div>`;
+}
+
+function render(){
+  const r = simulate(state);
+  $("winVal").textContent = state.windowDays;
+  renderAxis(r); renderGates(r); renderOutcome(r); renderCost(r);
+}
+
+$("win").addEventListener("input", (e) => { state.windowDays = Number(e.target.value); render(); });
+$("perDay").addEventListener("input", (e) => { state.perDay = Math.max(1, Math.min(5000, Number(e.target.value) || 1)); render(); });
+document.querySelectorAll('input[name="scn"]').forEach(el =>
+  el.addEventListener("change", (e) => { state.scenarioKey = e.target.value; render(); }));
+$("strict").addEventListener("change", (e) => { state.strictSpan = e.target.checked; render(); });
+$("reset").addEventListener("click", () => {
+  state.windowDays = 14; state.perDay = 300; state.scenarioKey = "launch"; state.strictSpan = false;
+  $("win").value = 14; $("perDay").value = 300; $("strict").checked = false;
+  document.querySelector('input[name="scn"][value="launch"]').checked = true;
+  render(); $("win").focus();
+});
+
+render();
+</script>
+</body>
+</html>
