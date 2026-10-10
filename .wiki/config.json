@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "profile": "software",
+  "sources": [
+    "docs",
+    "industry/prompts/group-definitions.md",
+    "industry/prompts/group-method.md",
+    "industry/prompts/group-pair.md",
+    "industry/prompts/group-batch.md",
+    "industry/prompts/group-signal.md",
+    "packages/backend/src/lib/url.ts",
+    "packages/backend/src/content/materials.ts",
+    "packages/backend/src/events/recall.ts",
+    "packages/backend/src/events/relate.ts",
+    "packages/backend/src/events/group.ts",
+    "packages/backend/src/events/consolidate.ts",
+    "packages/backend/src/publication/stories.ts",
+    "packages/backend/src/publication/followups.ts"
+  ],
+  "extensions": [
+    ".md",
+    ".txt",
+    ".html",
+    ".json",
+    ".ts"
+  ],
+  "exclude": [
+    "docs/assets/**"
+  ],
+  "page_dirs": {
+    "topic": "topics",
+    "entity": "entities",
+    "concept": "concepts"
+  },
+  "max_source_bytes": 1048576
+}
